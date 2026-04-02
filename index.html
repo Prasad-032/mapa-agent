@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAPA — Multi-Agent Productivity Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --border: #1e2730;
+    --accent: #00ff88;
+    --accent2: #00aaff;
+    --accent3: #ff6b35;
+    --text: #e8edf2;
+    --muted: #4a5568;
+    --card: #111820;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    background: rgba(8,12,16,0.95);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid rgba(0,255,136,0.3);
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: rgba(0,255,136,0.05);
+  }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* Hero */
+  .hero {
+    padding: 60px 0 40px;
+    text-align: center;
+  }
+
+  .hero h1 {
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -2px;
+    margin-bottom: 16px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 500px;
+    margin: 0 auto 40px;
+    line-height: 1.6;
+  }
+
+  /* Input area */
+  .input-area {
+    max-width: 700px;
+    margin: 0 auto 60px;
+  }
+
+  .input-wrapper {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    transition: border-color 0.2s;
+    overflow: hidden;
+  }
+
+  .input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+  }
+
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    padding: 20px;
+    resize: none;
+    min-height: 80px;
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  .input-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .presets {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .preset-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,255,136,0.05);
+  }
+
+  .run-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #000;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+
+  .run-btn:hover { background: #00cc6e; transform: translateY(-1px); }
+  .run-btn:active { transform: translateY(0); }
+  .run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Agent flow visualization */
+  .agent-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 0 auto 60px;
+    max-width: 800px;
+    flex-wrap: wrap;
+  }
+
+  .agent-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 24px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    min-width: 120px;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .agent-node.active {
+    border-color: var(--accent);
+    background: rgba(0,255,136,0.05);
+    box-shadow: 0 0 20px rgba(0,255,136,0.15);
+  }
+
+  .agent-node.active-blue {
+    border-color: var(--accent2);
+    background: rgba(0,170,255,0.05);
+    box-shadow: 0 0 20px rgba(0,170,255,0.15);
+  }
+
+  .agent-node.active-orange {
+    border-color: var(--accent3);
+    background: rgba(255,107,53,0.05);
+    box-shadow: 0 0 20px rgba(255,107,53,0.15);
+  }
+
+  .agent-icon {
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .agent-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .agent-node.active .agent-label { color: var(--accent); }
+  .agent-node.active-blue .agent-label { color: var(--accent2); }
+  .agent-node.active-orange .agent-label { color: var(--accent3); }
+
+  .agent-status {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--border);
+    color: var(--muted);
+  }
+
+  .agent-node.active .agent-status {
+    background: rgba(0,255,136,0.2);
+    color: var(--accent);
+  }
+
+  .arrow {
+    color: var(--muted);
+    font-size: 20px;
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+
+  /* Results grid */
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+
+  .result-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    overflow: hidden;
+    transition: all 0.3s;
+    opacity: 0.4;
+  }
+
+  .result-card.has-data {
+    opacity: 1;
+    border-color: var(--border);
+  }
+
+  .result-card.has-data.task-card { border-top: 2px solid var(--accent); }
+  .result-card.has-data.calendar-card { border-top: 2px solid var(--accent2); }
+  .result-card.has-data.notes-card { border-top: 2px solid #a855f7; }
+  .result-card.has-data.workflow-card { border-top: 2px solid var(--accent3); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .card-icon { font-size: 18px; }
+
+  .card-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--border);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .card-body { padding: 16px 20px; min-height: 120px; }
+
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+  }
+
+  .record-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+    font-size: 13px;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .record-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+  }
+
+  .badge-high { background: rgba(255,107,53,0.2); color: var(--accent3); }
+  .badge-med { background: rgba(0,170,255,0.2); color: var(--accent2); }
+  .badge-low { background: rgba(0,255,136,0.2); color: var(--accent); }
+  .badge-open { background: rgba(0,255,136,0.15); color: var(--accent); }
+
+  .record-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* Response panel */
+  .response-panel {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    margin-bottom: 40px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .response-panel.visible { display: block; }
+
+  .response-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,255,136,0.03);
+  }
+
+  .response-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .response-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .response-body {
+    padding: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: #7ee787;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    overflow-x: auto;
+  }
+
+  /* Metrics bar */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+
+  .metric {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    padding: 20px;
+    text-align: center;
+  }
+
+  .metric-value {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .metric-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .metric:nth-child(1) .metric-value { color: var(--accent); }
+  .metric:nth-child(2) .metric-value { color: var(--accent2); }
+  .metric:nth-child(3) .metric-value { color: #a855f7; }
+  .metric:nth-child(4) .metric-value { color: var(--accent3); }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0,0,0,0.3);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Section label */
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  @media (max-width: 600px) {
+    .results-grid { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .agent-flow { gap: 4px; }
+    .arrow { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">MAPA <span>//</span> Multi-Agent System</div>
+      <div class="status-pill">
+        <div class="dot"></div>
+        LIVE ON CLOUD RUN
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="hero">
+    <h1>One Request.<br><em>Many Agents.</em></h1>
+    <p>Type a natural language request. Watch the coordinator delegate to specialized AI agents that write real data to PostgreSQL.</p>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-wrapper">
+      <textarea id="userInput" placeholder="e.g. Schedule a team meeting for Friday and create a prep task..." rows="3"></textarea>
+      <div class="input-footer">
+        <div class="presets">
+          <button class="preset-btn" onclick="setPreset('Schedule a team meeting for Friday and create a prep task')">📅 Meeting + Task</button>
+          <button class="preset-btn" onclick="setPreset('Plan a sprint kickoff: schedule a meeting, create tasks for each team member, and note the goals')">🚀 Sprint Kickoff</button>
+          <button class="preset-btn" onclick="setPreset('Research summary: note key findings and create follow-up tasks')">📝 Research</button>
+        </div>
+        <button class="run-btn" id="runBtn" onclick="runWorkflow()">▶ RUN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent flow -->
+  <div class="section-label">Agent Pipeline</div>
+  <div class="agent-flow" id="agentFlow">
+    <div class="agent-node" id="node-coordinator">
+      <div class="agent-icon">🧠</div>
+      <div class="agent-label">Coordinator</div>
+      <div class="agent-status">IDLE</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="agent-node" id="node-task">
+      <div class="agent-icon">✅</div>
+      <div class="agent-label">Task Agent</div>
+      <div class="agent-status">IDLE</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="agent-node" id="node-calendar">
+      <div class="agent-icon">📅</div>
+      <div class="agent-label">Calendar Agent</div>
+      <div class="agent-status">IDLE</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="agent-node" id="node-notes">
+      <div class="agent-icon">📝</div>
+      <div class="agent-label">Notes Agent</div>
+      <div class="agent-status">IDLE</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="agent-node" id="node-db">
+      <div class="agent-icon">🗄️</div>
+      <div class="agent-label">PostgreSQL</div>
+      <div class="agent-status">IDLE</div>
+    </div>
+  </div>
+
+  <!-- Response panel -->
+  <div class="response-panel" id="responsePanel">
+    <div class="response-header">
+      <div class="response-title">⚡ Latest Response</div>
+      <div class="response-meta" id="responseMeta">—</div>
+    </div>
+    <div class="response-body" id="responseBody"></div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="section-label">Database Stats</div>
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-value" id="taskCount">0</div>
+      <div class="metric-label">Tasks</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value" id="eventCount">0</div>
+      <div class="metric-label">Events</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value" id="noteCount">0</div>
+      <div class="metric-label">Notes</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value" id="workflowCount">0</div>
+      <div class="metric-label">Workflows</div>
+    </div>
+  </div>
+
+  <!-- Results grid -->
+  <div class="section-label">Live Database Records</div>
+  <div class="results-grid">
+    <div class="result-card task-card" id="taskCard">
+      <div class="card-header">
+        <div class="card-title"><span class="card-icon">✅</span> Tasks</div>
+        <div class="card-count" id="taskBadge">0 records</div>
+      </div>
+      <div class="card-body" id="taskBody">
+        <div class="empty-state">No tasks yet</div>
+      </div>
+    </div>
+
+    <div class="result-card calendar-card" id="calendarCard">
+      <div class="card-header">
+        <div class="card-title"><span class="card-icon">📅</span> Calendar Events</div>
+        <div class="card-count" id="calendarBadge">0 records</div>
+      </div>
+      <div class="card-body" id="calendarBody">
+        <div class="empty-state">No events yet</div>
+      </div>
+    </div>
+
+    <div class="result-card notes-card" id="notesCard">
+      <div class="card-header">
+        <div class="card-title"><span class="card-icon">📝</span> Notes</div>
+        <div class="card-count" id="notesBadge">0 records</div>
+      </div>
+      <div class="card-body" id="notesBody">
+        <div class="empty-state">No notes yet</div>
+      </div>
+    </div>
+
+    <div class="result-card workflow-card" id="workflowCard">
+      <div class="card-header">
+        <div class="card-title"><span class="card-icon">⚡</span> Workflow Runs</div>
+        <div class="card-count" id="workflowBadge">0 records</div>
+      </div>
+      <div class="card-body" id="workflowBody">
+        <div class="empty-state">No runs yet</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const API = 'https://mapa-agent-187752653350.asia-south1.run.app';
+
+  function setPreset(text) {
+    document.getElementById('userInput').value = text;
+  }
+
+  function setNodeState(id, state) {
+    const node = document.getElementById('node-' + id);
+    if (!node) return;
+    node.className = 'agent-node';
+    const statusEl = node.querySelector('.agent-status');
+    if (state === 'active') {
+      node.classList.add('active');
+      statusEl.textContent = 'RUNNING';
+    } else if (state === 'done-blue') {
+      node.classList.add('active-blue');
+      statusEl.textContent = 'DONE';
+    } else if (state === 'done-orange') {
+      node.classList.add('active-orange');
+      statusEl.textContent = 'DONE';
+    } else if (state === 'done') {
+      node.classList.add('active');
+      statusEl.textContent = 'DONE';
+    } else {
+      statusEl.textContent = 'IDLE';
+    }
+  }
+
+  function resetNodes() {
+    ['coordinator','task','calendar','notes','db'].forEach(id => setNodeState(id, 'idle'));
+  }
+
+  async function runWorkflow() {
+    const msg = document.getElementById('userInput').value.trim();
+    if (!msg) return;
+
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>RUNNING';
+
+    resetNodes();
+    setNodeState('coordinator', 'active');
+
+    try {
+      const resp = await fetch(`${API}/workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg })
+      });
+
+      const data = await resp.json();
+
+      // Animate agents
+      setNodeState('coordinator', 'done');
+      const agents = data.agents_used || [];
+
+      setTimeout(() => {
+        if (agents.includes('task')) setNodeState('task', 'active');
+        if (agents.includes('calendar')) setNodeState('calendar', 'active');
+        if (agents.includes('notes')) setNodeState('notes', 'active');
+      }, 200);
+
+      setTimeout(() => {
+        if (agents.includes('task')) setNodeState('task', 'done');
+        if (agents.includes('calendar')) setNodeState('calendar', 'done-blue');
+        if (agents.includes('notes')) setNodeState('notes', 'done-orange');
+        setNodeState('db', 'done');
+      }, 800);
+
+      // Show response
+      const panel = document.getElementById('responsePanel');
+      panel.classList.add('visible');
+      document.getElementById('responseMeta').textContent = `${data.duration_ms}ms · ${agents.length} agents`;
+      document.getElementById('responseBody').textContent = JSON.stringify(data, null, 2);
+
+      // Refresh data
+      setTimeout(loadAllData, 1000);
+
+    } catch (e) {
+      document.getElementById('responseBody').textContent = 'Error: ' + e.message;
+      document.getElementById('responsePanel').classList.add('visible');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '▶ RUN';
+  }
+
+  async function loadAllData() {
+    try {
+      const [tasks, events, notes, workflows] = await Promise.all([
+        fetch(`${API}/tasks`).then(r => r.json()),
+        fetch(`${API}/events`).then(r => r.json()),
+        fetch(`${API}/notes`).then(r => r.json()),
+        fetch(`${API}/workflows`).then(r => r.json()),
+      ]);
+
+      // Update counts
+      document.getElementById('taskCount').textContent = tasks.length;
+      document.getElementById('eventCount').textContent = events.length;
+      document.getElementById('noteCount').textContent = notes.length;
+      document.getElementById('workflowCount').textContent = workflows.length;
+
+      document.getElementById('taskBadge').textContent = `${tasks.length} records`;
+      document.getElementById('calendarBadge').textContent = `${events.length} records`;
+      document.getElementById('notesBadge').textContent = `${notes.length} records`;
+      document.getElementById('workflowBadge').textContent = `${workflows.length} records`;
+
+      // Mark cards active
+      if (tasks.length) document.getElementById('taskCard').classList.add('has-data');
+      if (events.length) document.getElementById('calendarCard').classList.add('has-data');
+      if (notes.length) document.getElementById('notesCard').classList.add('has-data');
+      if (workflows.length) document.getElementById('workflowCard').classList.add('has-data');
+
+      // Render tasks
+      document.getElementById('taskBody').innerHTML = tasks.slice(0,3).map(t => `
+        <div class="record-item">
+          <div class="record-title">
+            ${t.title}
+            <span class="badge badge-${(t.priority||'med').toLowerCase()}">${t.priority}</span>
+            <span class="badge badge-open">${t.status}</span>
+          </div>
+          <div class="record-meta">Due: ${t.due_date || 'TBD'} · ${t.created_at?.slice(0,10)}</div>
+        </div>
+      `).join('') || '<div class="empty-state">No tasks yet</div>';
+
+      // Render events
+      document.getElementById('calendarBody').innerHTML = events.slice(0,3).map(e => `
+        <div class="record-item">
+          <div class="record-title">${e.title}</div>
+          <div class="record-meta">${e.start_time} · ${e.duration_m}min · ${(e.attendees||[]).join(', ') || 'No attendees'}</div>
+        </div>
+      `).join('') || '<div class="empty-state">No events yet</div>';
+
+      // Render notes
+      document.getElementById('notesBody').innerHTML = notes.slice(0,3).map(n => `
+        <div class="record-item">
+          <div class="record-title">${n.title}</div>
+          <div class="record-meta">Tags: ${(n.tags||[]).join(', ') || 'none'}</div>
+        </div>
+      `).join('') || '<div class="empty-state">No notes yet</div>';
+
+      // Render workflows
+      document.getElementById('workflowBody').innerHTML = workflows.slice(0,3).map(w => `
+        <div class="record-item">
+          <div class="record-title">${w.intent}</div>
+          <div class="record-meta">${(w.agents_used||[]).join(' → ')} · ${w.duration_ms}ms · <span style="color:var(--accent)">${w.status}</span></div>
+        </div>
+      `).join('') || '<div class="empty-state">No workflows yet</div>';
+
+    } catch(e) {
+      console.error('Failed to load data:', e);
+    }
+  }
+
+  // Enter key to submit
+  document.getElementById('userInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runWorkflow(); }
+  });
+
+  // Load on start
+  loadAllData();
+</script>
+</body>
+</html>
